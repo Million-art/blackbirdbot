@@ -23,12 +23,10 @@ def get_market_price(symbol):
 
         if "price" in data:
             return f"Current price of {symbol.upper()} is: ${data['price']}"
-        elif "msg" in data:
-            return f"Error: {data['msg']}"
         else:
             return "Invalid token pair! Please try again (e.g., BTCUSDT, ETHUSD)."
     except Exception as e:
-        return f"Error fetching market price: {str(e)}"
+        return "Error fetching market price."
 
 # Function to generate main keyboard
 def generate_main_keyboard():
@@ -78,13 +76,13 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"Hello, the bot is running!")
 
-# Start HTTP Server
-def run_server():
-    server_address = ('', 8000)
-    httpd = HTTPServer(server_address, Handler)
-    print("Starting HTTP server on port 8000...")
-    httpd.serve_forever()
+# # Start HTTP Server
+# def run_server():
+#     server_address = ('', 8000)
+#     httpd = HTTPServer(server_address, Handler)
+#     print("Starting HTTP server on port 8000...")
+#     httpd.serve_forever()
 
-# Start the bot
-if __name__ == "__main__":
-    run_server()
+# # Start the bot
+# if __name__ == "__main__":
+#     run_server()
