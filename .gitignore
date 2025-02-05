@@ -1,0 +1,45 @@
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore environment variables & secret keys
+.env
+*.env
+
+# Ignore virtual environments
+venv/
+env/
+
+# Ignore dependency management files
+Pipfile
+Pipfile.lock
+poetry.lock
+
+# Ignore logs and database files
+*.log
+*.sqlite3
+*.db
+
+# Ignore compiled Cython files
+*.so
+
+# Ignore VS Code settings
+.vscode/
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore deployed webhook logs (optional)
+logs/
+*.log
+
+# Ignore binary files
+*.exe
+*.dll
+*.bin
+*.swp
+*.swo
+
+# Ignore ngrok config files & cache
+ngrok*
