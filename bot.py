@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import asyncio
+import websockets
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telebot.async_telebot import AsyncTeleBot
 from telebot import types
@@ -14,50 +15,61 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 bot = AsyncTeleBot(BOT_TOKEN)
 
-# Function to fetch market price from Binance API
-import requests
+# Binance WebSocket URL
+BINANCE_WS_URL = "wss://stream.binance.com:9443/ws/"
 
-def get_market_price(symbol):
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol.lower()}&vs_currencies=usd"
+# Store active WebSocket connections
+active_websockets = {}
+
+# Function to start a WebSocket connection
+async def get_live_market_price(symbol, chat_id):
+    symbol = symbol.lower()  # Binance expects lowercase pairs
+    ws_url = f"{BINANCE_WS_URL}{symbol}@trade"
+
     try:
-        response = requests.get(url)
-        data = response.json()
+        async with websockets.connect(ws_url) as websocket:
+            active_websockets[chat_id] = websocket
+            while True:
+                response = await websocket.recv()
+                data = json.loads(response)
 
-        if symbol.lower() in data and "usd" in data[symbol.lower()]:
-            return f"Current price of {symbol.upper()} is: ${data[symbol.lower()]['usd']}"
-        else:
-            return "Invalid token pair! Please try again (e.g., bitcoin, ethereum)."
+                if "p" in data:
+                    price = data["p"]
+                    await bot.send_message(chat_id, f"🔴 Live Price Update for {symbol.upper()}: ${price}")
+
     except Exception as e:
-        return "Error fetching market price."
-
-# Function to generate main keyboard
-def generate_main_keyboard():
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        types.InlineKeyboardButton("📈 Market Price", callback_data="market_price"),
-        types.InlineKeyboardButton("🚀 Launch App", web_app=types.WebAppInfo(url="https://blackbird-2lbs.vercel.app"))
-    )
-    return keyboard
+        await bot.send_message(chat_id, "⚠️ Error connecting to live market data.")
+        print(f"WebSocket Error: {e}")
 
 # Handle /start command
 @bot.message_handler(commands=['start'])
 async def start(message):
-    welcome_message = "Welcome! How can I assist you today?"
-    await bot.send_message(message.chat.id, welcome_message, reply_markup=generate_main_keyboard())
+    welcome_message = "Welcome! Send a token pair (e.g., **BTCUSDT**) to get live prices."
+    await bot.send_message(message.chat.id, welcome_message)
 
-# Handle button clicks
-@bot.callback_query_handler(func=lambda call: call.data == "market_price")
-async def ask_for_token_pair(call):
-    await bot.send_message(call.message.chat.id, "Please enter the token pair (e.g., BTCUSDT, ETHUSD):")
-
-# Handle user input for market price
+# Handle user input for real-time market price
 @bot.message_handler(func=lambda message: True)
 async def fetch_market_price(message):
     token_pair = message.text.strip().upper()
-    price_info = get_market_price(token_pair)
-    await bot.send_message(message.chat.id, price_info)
+    
+    if message.chat.id in active_websockets:
+        await bot.send_message(message.chat.id, "⚠️ You already have a live stream running. Send /stop to disconnect first.")
+        return
 
-# HTTP Server to handle updates from Telegram Webhook
+    await bot.send_message(message.chat.id, f"✅ Starting live price updates for {token_pair}...")
+    asyncio.create_task(get_live_market_price(token_pair, message.chat.id))
+
+# Handle /stop command to close WebSocket
+@bot.message_handler(commands=['stop'])
+async def stop_stream(message):
+    if message.chat.id in active_websockets:
+        websocket = active_websockets.pop(message.chat.id)
+        await websocket.close()
+        await bot.send_message(message.chat.id, "✅ Live price stream stopped.")
+    else:
+        await bot.send_message(message.chat.id, "⚠️ No active price stream found.")
+
+# HTTP Server to handle Webhook updates
 class Handler(BaseHTTPRequestHandler):
     async def process_update(self, update_dict):
         update = types.Update.de_json(update_dict)
@@ -78,13 +90,3 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"Hello, the bot is running!")
 
-# # Start HTTP Server
-# def run_server():
-#     server_address = ('', 8000)
-#     httpd = HTTPServer(server_address, Handler)
-#     print("Starting HTTP server on port 8000...")
-#     httpd.serve_forever()
-
-# # Start the bot
-# if __name__ == "__main__":
-#     run_server()
