@@ -1,42 +1,88 @@
 import os
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+import json
+import requests
+import asyncio
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from telebot.async_telebot import AsyncTeleBot
+from telebot import types
 from dotenv import load_dotenv
 
-# Load environment variables from a .env file
+# Load environment variables
 load_dotenv()
 
-# Get the Telegram bot token from the environment variable
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# Initialize Telegram Bot
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+bot = AsyncTeleBot(BOT_TOKEN)
 
-if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("Telegram bot token is missing. Set TELEGRAM_BOT_TOKEN in the environment.")
+# Function to fetch market price from Binance API
+def get_market_price(symbol):
+    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol.upper()}"
+    try:
+        response = requests.get(url)
+        data = response.json()
 
-# Command to start the bot
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('Welcome to BlackbirdAI! How can I assist you today?')
+        if "price" in data:
+            return f"Current price of {symbol.upper()} is: ${data['price']}"
+        else:
+            return "Invalid token pair! Please try again (e.g., BTCUSDT, ETHUSD)."
+    except Exception as e:
+        return "Error fetching market price."
 
-# Handle any other messages
-def handle_message(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('I dont know what you are saying. Use /start to begin.')
+# Function to generate main keyboard
+def generate_main_keyboard():
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("📈 Market Price", callback_data="market_price"),
+        types.InlineKeyboardButton("🚀 Launch App", web_app=types.WebAppInfo(url="https://blackbird-2lbs.vercel.app"))
+    )
+    return keyboard
 
-# Main function to start the bot
-def main() -> None:
-    # Initialize the Updater with your bot token
-    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
+# Handle /start command
+@bot.message_handler(commands=['start'])
+async def start(message):
+    welcome_message = "Welcome! How can I assist you today?"
+    await bot.send_message(message.chat.id, welcome_message, reply_markup=generate_main_keyboard())
 
-    # Get the dispatcher to register handlers
-    dispatcher = updater.dispatcher
+# Handle button clicks
+@bot.callback_query_handler(func=lambda call: call.data == "market_price")
+async def ask_for_token_pair(call):
+    await bot.send_message(call.message.chat.id, "Please enter the token pair (e.g., BTCUSDT, ETHUSD):")
 
-    # Register the /start command handler
-    dispatcher.add_handler(CommandHandler("start", start))
+# Handle user input for market price
+@bot.message_handler(func=lambda message: True)
+async def fetch_market_price(message):
+    token_pair = message.text.strip().upper()
+    price_info = get_market_price(token_pair)
+    await bot.send_message(message.chat.id, price_info)
 
-    # Register a message handler for any other text messages
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+# HTTP Server to handle updates from Telegram Webhook
+class Handler(BaseHTTPRequestHandler):
+    async def process_update(self, update_dict):
+        update = types.Update.de_json(update_dict)
+        await bot.process_new_updates([update])
 
-    # Start the bot
-    updater.start_polling()
-    updater.idle()
+    def do_POST(self):
+        content_length = int(self.headers['Content-Length'])  
+        post_data = self.rfile.read(content_length)
+        update_dict = json.loads(post_data.decode('utf-8'))
 
-if __name__ == "__main__":
-    main()
+        asyncio.run(self.process_update(update_dict))
+
+        self.send_response(200)
+        self.end_headers()
+
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Hello, the bot is running!")
+
+# # Start HTTP Server
+# def run_server():
+#     server_address = ('', 8000)
+#     httpd = HTTPServer(server_address, Handler)
+#     print("Starting HTTP server on port 8000...")
+#     httpd.serve_forever()
+
+# # Start the bot
+# if __name__ == "__main__":
+#     run_server()
