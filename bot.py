@@ -23,7 +23,7 @@ def get_market_price(symbol):
 
         # Check if data contains the necessary price information
         if "data" in data and len(data["data"]) > 0:
-            price = data["data"][0]["price_usd"]
+            price = float(data["data"][0]["price_usd"])  # Convert price to float
             return f"Current price of {symbol.upper()} is: ${price:.2f}"
         else:
             return "Invalid token! Please try again with a valid symbol (e.g., BTC, ETH)."
