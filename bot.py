@@ -14,19 +14,19 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 bot = AsyncTeleBot(BOT_TOKEN)
 
-# Function to fetch market price from CoinPaprika API
+# Function to fetch market price from Coinlore API
 def get_market_price(symbol):
-    url = f"https://api.coinpaprika.com/v1/tickers/{symbol.lower()}"
+    url = f"https://api.coinlore.net/api/tickers/?symbol={symbol.upper()}"
     try:
         response = requests.get(url)
         data = response.json()
 
         # Check if data contains the necessary price information
-        if "quotes" in data:
-            price = data["quotes"]["USD"]["price"]
+        if "data" in data and len(data["data"]) > 0:
+            price = data["data"][0]["price_usd"]
             return f"Current price of {symbol.upper()} is: ${price:.2f}"
         else:
-            return "Invalid token pair! Please try again (e.g., bitcoin, ethereum)."
+            return "Invalid token! Please try again with a valid symbol (e.g., BTC, ETH)."
     except Exception as e:
         return f"Error fetching market price: {str(e)}"
 
@@ -48,12 +48,16 @@ async def start(message):
 # Handle button clicks
 @bot.callback_query_handler(func=lambda call: call.data == "market_price")
 async def ask_for_token_pair(call):
-    await bot.send_message(call.message.chat.id, "Please enter the token pair (e.g., BTC, ETH):")
+    await bot.send_message(call.message.chat.id, "Please enter the token (e.g., BTC, ETH):")
 
 # Handle user input for market price
 @bot.message_handler(func=lambda message: True)
 async def fetch_market_price(message):
+    # Ensure we only process the first token from the message
     token_pair = message.text.strip().lower()
+    if ',' in token_pair:
+        token_pair = token_pair.split(',')[0].strip()  # Get only the first token if multiple are provided
+
     price_info = get_market_price(token_pair)
     await bot.send_message(message.chat.id, price_info)
 
