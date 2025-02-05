@@ -15,18 +15,23 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 bot = AsyncTeleBot(BOT_TOKEN)
 
 # Function to fetch market price from Binance API
+# Function to fetch market price from Binance API
 def get_market_price(symbol):
     url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol.upper()}"
     try:
         response = requests.get(url)
         data = response.json()
 
+        # Check if the API response contains the 'price' field
         if "price" in data:
             return f"Current price of {symbol.upper()} is: ${data['price']}"
+        elif "msg" in data:
+            # Handle Binance API error message
+            return f"Error: {data['msg']}"
         else:
             return "Invalid token pair! Please try again (e.g., BTCUSDT, ETHUSD)."
     except Exception as e:
-        return "Error fetching market price."
+        return f"Error fetching market price: {str(e)}"
 
 # Function to generate main keyboard
 def generate_main_keyboard():
