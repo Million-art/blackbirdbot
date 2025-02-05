@@ -14,16 +14,16 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 bot = AsyncTeleBot(BOT_TOKEN)
 
-# Function to fetch market price from Binance API
-
+# Function to fetch market price from CoinPaprika API
 def get_market_price(symbol):
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol.lower()}&vs_currencies=usd"
+    url = f"https://api.coinpaprika.com/v1/tickers/{symbol.lower()}"
     try:
         response = requests.get(url)
         data = response.json()
 
-        if symbol.lower() in data:
-            price = data[symbol.lower()]["usd"]
+        # Check if data contains the necessary price information
+        if "quotes" in data:
+            price = data["quotes"]["USD"]["price"]
             return f"Current price of {symbol.upper()} is: ${price:.2f}"
         else:
             return "Invalid token pair! Please try again (e.g., bitcoin, ethereum)."
@@ -48,12 +48,12 @@ async def start(message):
 # Handle button clicks
 @bot.callback_query_handler(func=lambda call: call.data == "market_price")
 async def ask_for_token_pair(call):
-    await bot.send_message(call.message.chat.id, "Please enter the token pair (e.g., BTCUSDT, ETHUSD):")
+    await bot.send_message(call.message.chat.id, "Please enter the token pair (e.g., BTC, ETH):")
 
 # Handle user input for market price
 @bot.message_handler(func=lambda message: True)
 async def fetch_market_price(message):
-    token_pair = message.text.strip().upper()
+    token_pair = message.text.strip().lower()
     price_info = get_market_price(token_pair)
     await bot.send_message(message.chat.id, price_info)
 
@@ -78,13 +78,13 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"Hello, the bot is running!")
 
-# # Start HTTP Server
-# def run_server():
-#     server_address = ('', 8000)
-#     httpd = HTTPServer(server_address, Handler)
-#     print("Starting HTTP server on port 8000...")
-#     httpd.serve_forever()
+# Start HTTP Server
+def run_server():
+    server_address = ('', 8000)
+    httpd = HTTPServer(server_address, Handler)
+    print("Starting HTTP server on port 8000...")
+    httpd.serve_forever()
 
-# # Start the bot
-# if __name__ == "__main__":
-#     run_server()
+# Start the bot
+if __name__ == "__main__":
+    run_server()
