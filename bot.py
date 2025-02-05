@@ -15,21 +15,18 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 bot = AsyncTeleBot(BOT_TOKEN)
 
 # Function to fetch market price from Binance API
-# Function to fetch market price from Binance API
+
 def get_market_price(symbol):
-    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol.upper()}"
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol.lower()}&vs_currencies=usd"
     try:
         response = requests.get(url)
         data = response.json()
 
-        # Check if the API response contains the 'price' field
-        if "price" in data:
-            return f"Current price of {symbol.upper()} is: ${data['price']}"
-        elif "msg" in data:
-            # Handle Binance API error message
-            return f"Error: {data['msg']}"
+        if symbol.lower() in data:
+            price = data[symbol.lower()]["usd"]
+            return f"Current price of {symbol.upper()} is: ${price:.2f}"
         else:
-            return "Invalid token pair! Please try again (e.g., BTCUSDT, ETHUSD)."
+            return "Invalid token pair! Please try again (e.g., bitcoin, ethereum)."
     except Exception as e:
         return f"Error fetching market price: {str(e)}"
 
